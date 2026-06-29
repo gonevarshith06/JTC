@@ -1,8 +1,10 @@
 # Dependency directories
 node_modules/
+trading-company-website-code/node_modules/
 
 # Build output
 dist/
+trading-company-website-code/dist/
 
 # Local env files
 .env
