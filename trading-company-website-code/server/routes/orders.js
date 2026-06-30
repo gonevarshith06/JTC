@@ -7,7 +7,22 @@ const router = express.Router();
 // Get all orders (Admin only)
 router.get('/', requireAuth, (req, res) => {
   if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
-  res.json(db.orders);
+  // sort by created_at desc
+  const sortedOrders = [...db.orders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  res.json(sortedOrders);
+});
+
+// Get my orders (Client)
+router.get('/my-orders', requireAuth, (req, res) => {
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  const myOrders = db.orders.filter(o => 
+    (o.email && o.email === user.email) || 
+    (o.mobile && o.mobile === user.mobile_number)
+  ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  
+  res.json(myOrders);
 });
 
 // Create new order (Public/Client)

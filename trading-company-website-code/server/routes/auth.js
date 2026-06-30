@@ -109,4 +109,22 @@ router.get('/profile', requireAuth, (req, res) => {
   res.json({ id, full_name, email, mobile_number, role });
 });
 
+// Change Password
+router.put('/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Required fields missing' });
+  
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  const isValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isValid) return res.status(400).json({ error: 'Invalid current password' });
+  
+  user.password = await bcrypt.hash(newPassword, 10);
+  saveDb();
+  
+  logActivity(user.id, 'Change Password', 'Password changed successfully');
+  res.json({ message: 'Password changed successfully' });
+});
+
 export default router;

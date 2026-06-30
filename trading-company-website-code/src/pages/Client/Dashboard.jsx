@@ -1,9 +1,50 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 const ClientDashboard = () => {
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('orders');
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchMyOrders();
+    }
+  }, [activeTab]);
+
+  const fetchMyOrders = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get('/api/orders/my-orders');
+      setOrders(res.data);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return setPasswordMsg({ type: 'error', text: 'New passwords do not match' });
+    }
+    try {
+      const res = await axios.put('/api/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setPasswordMsg({ type: 'success', text: res.data.message });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPasswordMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password' });
+    }
+  };
 
   return (
     <div className="dashboard-container">
@@ -11,10 +52,24 @@ const ClientDashboard = () => {
         <h3>Client Portal</h3>
         <nav>
           <ul>
-            <li><Link to="/client">Dashboard</Link></li>
-            <li><Link to="/client/appointments">My Appointments</Link></li>
-            <li><Link to="/client/profile">My Profile</Link></li>
-            <li><Link to="/client/documents">Documents</Link></li>
+            <li>
+              <button 
+                className={`btn btn-outline ${activeTab === 'orders' ? 'active' : ''}`}
+                onClick={() => setActiveTab('orders')}
+                style={{ width: '100%', textAlign: 'left', marginBottom: '10px' }}
+              >
+                My Orders
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`btn btn-outline ${activeTab === 'password' ? 'active' : ''}`}
+                onClick={() => setActiveTab('password')}
+                style={{ width: '100%', textAlign: 'left' }}
+              >
+                Change Password
+              </button>
+            </li>
           </ul>
         </nav>
       </div>
@@ -24,20 +79,86 @@ const ClientDashboard = () => {
           <button onClick={logout} className="btn btn-outline">Logout</button>
         </header>
         <main>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <h4>Upcoming Appointments</h4>
-              <p>1</p>
-            </div>
-            <div className="stat-card">
-              <h4>Pending Documents</h4>
-              <p>0</p>
-            </div>
-          </div>
-          <section className="recent-activity">
-             <h3>Book a New Appointment</h3>
-             <button className="btn btn-primary">Book Now</button>
-          </section>
+          
+          {activeTab === 'orders' && (
+            <section className="dashboard-section">
+              <h3>My Orders</h3>
+              {loading ? <p>Loading orders...</p> : (
+                <div className="table-responsive">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.length === 0 ? (
+                        <tr><td colSpan="4">No orders found.</td></tr>
+                      ) : (
+                        orders.map(order => (
+                          <tr key={order.id}>
+                            <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                            <td>{order.product}</td>
+                            <td>{order.quantity}</td>
+                            <td>
+                              <span className={`status-badge ${order.status === 'Completed' ? 'status-completed' : 'status-pending'}`}>
+                                {order.status === 'Completed' ? 'Order Placed' : 'Pending'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'password' && (
+            <section className="dashboard-section" style={{ maxWidth: '500px' }}>
+              <h3>Change Password</h3>
+              {passwordMsg.text && (
+                <div className={`alert ${passwordMsg.type === 'error' ? 'alert-error' : 'alert-success'}`}>
+                  {passwordMsg.text}
+                </div>
+              )}
+              <form onSubmit={handlePasswordChange} className="auth-form" style={{ marginTop: '20px' }}>
+                <div className="form-group">
+                  <label>Current Password</label>
+                  <input 
+                    type="password" 
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>New Password</label>
+                  <input 
+                    type="password" 
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Confirm New Password</label>
+                  <input 
+                    type="password" 
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                    required 
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary">Update Password</button>
+              </form>
+            </section>
+          )}
+
         </main>
       </div>
     </div>
