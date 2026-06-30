@@ -36,7 +36,10 @@ function Home() {
         <div className="container hero-grid">
           <div className="hero-copy reveal">
             <p className="eyebrow">Bulk food trading and local distribution</p>
-            <h1>Jayalakshmi Trading Company</h1>
+            <h1 style={{ marginBottom: '12px' }}>Jayalakshmi Trading Company</h1>
+            <div style={{ display: 'inline-block', background: 'var(--yellow-100)', padding: '6px 14px', borderRadius: '20px', color: 'var(--green-900)', fontSize: '0.85rem', fontWeight: '700', marginBottom: '22px' }}>
+              Estd. 2003 • 20+ Years of Excellence
+            </div>
             <p className="hero-tagline">
               Quality edible oils and dal products supplied to retail stores,
               grocery shops, supermarkets, and wholesale buyers.
