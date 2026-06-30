@@ -1,6 +1,7 @@
-import { Menu, ShoppingBasket, X } from 'lucide-react';
+import { Menu, ShoppingBasket, X, User } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Home' },
@@ -12,8 +13,16 @@ const navItems = [
 
 function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleLogout = async () => {
+    await logout();
+    closeMenu();
+    navigate('/');
+  };
 
   return (
     <header className="navbar">
@@ -50,6 +59,26 @@ function Navbar() {
               {item.label}
             </NavLink>
           ))}
+          
+          <div className="nav-divider"></div>
+          
+          {user ? (
+            <>
+              <NavLink
+                to={user.role === 'Admin' ? '/admin' : '/client'}
+                onClick={closeMenu}
+                className={({ isActive }) => (isActive ? 'active auth-link' : 'auth-link')}
+              >
+                <User size={18} style={{marginRight: '6px'}}/> Dashboard
+              </NavLink>
+              <button className="nav-btn-logout" onClick={handleLogout}>Logout</button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" onClick={closeMenu} className="auth-link">Login</NavLink>
+              <NavLink to="/register" onClick={closeMenu} className="auth-link nav-btn-primary">Register</NavLink>
+            </>
+          )}
         </nav>
       </div>
     </header>

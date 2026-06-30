@@ -8,7 +8,8 @@ import {
   Truck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { categories, products } from '../data/products.js';
+import { useEffect, useState } from 'react';
+import { categories } from '../data/products.js';
 import ProductCard from '../components/ProductCard.jsx';
 
 const reasons = [
@@ -20,6 +21,15 @@ const reasons = [
 ];
 
 function Home() {
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => setProducts(data))
+      .catch(console.error);
+  }, []);
+
   return (
     <>
       <section className="hero">

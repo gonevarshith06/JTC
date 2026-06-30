@@ -1,7 +1,6 @@
 import { Send } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { products } from '../data/products.js';
 
 const initialForm = {
   ownerName: '',
@@ -27,11 +26,19 @@ const requiredFields = {
 function Order() {
   const [searchParams] = useSearchParams();
   const requestedProduct = searchParams.get('product') || '';
-  const productNames = useMemo(() => products.map((product) => product.name), []);
+  const [products, setProducts] = useState([]);
+  const productNames = useMemo(() => products.map((product) => product.name), [products]);
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => setProducts(data))
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (requestedProduct && productNames.includes(requestedProduct)) {
@@ -67,7 +74,7 @@ function Order() {
     return nextErrors;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = validate();
 
@@ -76,20 +83,40 @@ function Order() {
       return;
     }
 
-    const order = {
-      ...form,
-      id: Date.now(),
-      submittedAt: new Date().toISOString()
-    };
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(form)
+      });
 
-    const saved = JSON.parse(window.localStorage.getItem('tradeOrders') || '[]');
-    const nextOrders = [order, ...saved];
-    window.localStorage.setItem('tradeOrders', JSON.stringify(nextOrders));
+      if (response.ok) {
+        // Construct WhatsApp Message
+        const messageBody = `*New Order Received!*
+*Shop Name:* ${form.shopName}
+*Owner Name:* ${form.ownerName}
+*Mobile:* ${form.mobile}
+*Email:* ${form.email}
+*Address:* ${form.address}
+*Product:* ${form.product}
+*Quantity:* ${form.quantity}
+*Additional Message:* ${form.message || 'None'}`;
 
-    setSavedCount(nextOrders.length);
-    setSuccess(true);
-    setErrors({});
-    setForm({ ...initialForm, product: requestedProduct && productNames.includes(requestedProduct) ? requestedProduct : '' });
+        const whatsappUrl = `https://wa.me/919848359260?text=${encodeURIComponent(messageBody)}`;
+        window.open(whatsappUrl, '_blank');
+
+        setSuccess(true);
+        setErrors({});
+        setForm({ ...initialForm, product: requestedProduct && productNames.includes(requestedProduct) ? requestedProduct : '' });
+      } else {
+        const data = await response.json();
+        setErrors({ submit: data.error || 'Failed to submit order' });
+      }
+    } catch (error) {
+      setErrors({ submit: 'Network error. Please try again later.' });
+    }
   };
 
   return (
@@ -112,8 +139,7 @@ function Order() {
           <div className="form-intro">
             <h2>Bulk supply order</h2>
             <p>
-              This form stores your order temporarily in this browser using
-              localStorage. No backend server is required for this demo version.
+              Fill out the form below to request a bulk supply. Our team will contact you with availability and pricing.
             </p>
             <div className="mini-list">
               <span>Edible oil</span>

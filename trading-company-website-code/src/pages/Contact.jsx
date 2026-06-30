@@ -20,7 +20,7 @@ function Contact() {
     setSent(false);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = {};
 
@@ -39,9 +39,24 @@ function Contact() {
       return;
     }
 
-    setSent(true);
-    setErrors({});
-    setForm(contactInitial);
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
+      
+      if (response.ok) {
+        setSent(true);
+        setErrors({});
+        setForm(contactInitial);
+      } else {
+        const data = await response.json();
+        setErrors({ submit: data.error || 'Failed to send message.' });
+      }
+    } catch (err) {
+      setErrors({ submit: 'Network error. Please try again later.' });
+    }
   };
 
   return (
@@ -90,6 +105,11 @@ function Contact() {
             {sent && (
               <div className="success-message" role="status">
                 Thank you! Your message has been received.
+              </div>
+            )}
+            {errors.submit && (
+              <div className="auth-error" role="status">
+                {errors.submit}
               </div>
             )}
             <label>
