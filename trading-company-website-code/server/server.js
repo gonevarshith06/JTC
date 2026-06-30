@@ -28,22 +28,38 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+let dbInitialized = false;
+const dbInitPromise = initDb().then(() => {
+  dbInitialized = true;
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+});
+
+// Middleware to ensure DB is ready before routing in Serverless
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    try {
+      await dbInitPromise;
+    } catch (err) {
+      return res.status(500).json({ error: 'Database initialization failed' });
+    }
+  }
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/messages', messagesRoutes);
 
-// Initialize DB and start server
-initDb().then(() => {
-  // Only start listening if not running in a serverless environment
-  if (process.env.NODE_ENV !== 'production') {
+// Only start listening if not running in a serverless environment
+if (process.env.NODE_ENV !== 'production') {
+  dbInitPromise.then(() => {
     app.listen(PORT, () => {
       console.log(`Backend server running on http://127.0.0.1:${PORT}`);
     });
-  }
-}).catch(err => {
-  console.error('Failed to initialize database:', err);
-});
+  });
+}
 
 export default app;
