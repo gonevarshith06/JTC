@@ -97,27 +97,33 @@ const ClientDashboard = () => {
             <section className="dashboard-section">
               <h3>My Orders</h3>
               {loading ? <p>Loading orders...</p> : (
-                <div className="table-responsive">
-                  <table className="admin-table">
+                <div className="recent-activity" style={{ padding: 0, overflowX: 'auto', marginTop: '20px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Product</th>
-                        <th>Quantity</th>
-                        <th>Status</th>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--line)' }}>
+                        <th style={{ padding: '16px 24px' }}>Date</th>
+                        <th style={{ padding: '16px' }}>Product</th>
+                        <th style={{ padding: '16px' }}>Quantity</th>
+                        <th style={{ padding: '16px 24px' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {orders.length === 0 ? (
-                        <tr><td colSpan="4">No orders found.</td></tr>
+                        <tr><td colSpan="4" style={{ padding: '24px', color: 'var(--text-light)', textAlign: 'center' }}>No orders found.</td></tr>
                       ) : (
                         orders.map(order => (
-                          <tr key={order.id}>
-                            <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                            <td>{order.product}</td>
-                            <td>{order.quantity}</td>
-                            <td>
-                              <span className={`status-badge ${order.status === 'Completed' ? 'status-completed' : 'status-pending'}`}>
+                          <tr key={order.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                            <td style={{ padding: '16px 24px', color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '16px', fontWeight: 500 }}>{order.product}</td>
+                            <td style={{ padding: '16px' }}>{order.quantity}</td>
+                            <td style={{ padding: '16px 24px' }}>
+                              <span style={{ 
+                                padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600,
+                                background: order.status === 'Completed' ? '#dcfce3' : '#fef3c7',
+                                color: order.status === 'Completed' ? '#166534' : '#92400e'
+                              }}>
                                 {order.status === 'Completed' ? 'Order Placed' : 'Pending'}
                               </span>
                             </td>
