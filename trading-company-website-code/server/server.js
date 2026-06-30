@@ -29,19 +29,26 @@ const limiter = rateLimit({
 app.use(limiter);
 
 let dbInitialized = false;
+let dbError = null;
+
 const dbInitPromise = initDb().then(() => {
   dbInitialized = true;
 }).catch(err => {
+  dbError = err;
   console.error('Failed to initialize database:', err);
 });
 
 // Middleware to ensure DB is ready before routing in Serverless
 app.use(async (req, res, next) => {
+  if (dbError) {
+    return res.status(500).json({ error: 'Database failed to initialize: ' + dbError.message + '\n' + dbError.stack });
+  }
+  
   if (!dbInitialized) {
     try {
       await dbInitPromise;
     } catch (err) {
-      return res.status(500).json({ error: 'Database initialization failed' });
+      return res.status(500).json({ error: 'Database initialization failed: ' + err.message });
     }
   }
   next();
