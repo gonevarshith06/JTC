@@ -62,6 +62,7 @@ const AdminOrders = () => {
             <li><Link to="/admin/orders" className="active">Orders</Link></li>
             <li><Link to="/admin/products">Products</Link></li>
             <li><Link to="/admin/messages">Messages</Link></li>
+            <li><Link to="/admin/settings">Settings</Link></li>
           </ul>
         </nav>
       </div>

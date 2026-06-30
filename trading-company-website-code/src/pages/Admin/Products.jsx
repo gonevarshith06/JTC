@@ -109,6 +109,7 @@ const AdminProducts = () => {
             <li><Link to="/admin/orders">Orders</Link></li>
             <li><Link to="/admin/products" className="active">Products</Link></li>
             <li><Link to="/admin/messages">Messages</Link></li>
+            <li><Link to="/admin/settings">Settings</Link></li>
           </ul>
         </nav>
       </div>

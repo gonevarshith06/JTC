@@ -45,6 +45,7 @@ const AdminMessages = () => {
             <li><Link to="/admin/orders">Orders</Link></li>
             <li><Link to="/admin/products">Products</Link></li>
             <li><Link to="/admin/messages" className="active">Messages</Link></li>
+            <li><Link to="/admin/settings">Settings</Link></li>
           </ul>
         </nav>
       </div>

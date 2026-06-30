@@ -13,6 +13,7 @@ import AdminDashboard from './pages/Admin/Dashboard.jsx';
 import AdminOrders from './pages/Admin/Orders.jsx';
 import AdminProducts from './pages/Admin/Products.jsx';
 import AdminMessages from './pages/Admin/Messages.jsx';
+import AdminSettings from './pages/Admin/Settings.jsx';
 import ClientDashboard from './pages/Client/Dashboard.jsx';
 
 function App() {
@@ -49,6 +50,11 @@ function App() {
           <Route path="/admin/messages" element={
             <ProtectedRoute requiredRole="Admin">
               <AdminMessages />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute requiredRole="Admin">
+              <AdminSettings />
             </ProtectedRoute>
           } />
 
