@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 
 const ClientDashboard = () => {
   const { user, logout } = useAuth();
@@ -20,8 +19,13 @@ const ClientDashboard = () => {
   const fetchMyOrders = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/orders/my-orders');
-      setOrders(res.data);
+      const res = await fetch('/api/orders/my-orders');
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data);
+      } else {
+        console.error('Failed to fetch orders');
+      }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -35,14 +39,23 @@ const ClientDashboard = () => {
       return setPasswordMsg({ type: 'error', text: 'New passwords do not match' });
     }
     try {
-      const res = await axios.put('/api/auth/change-password', {
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword
+      const res = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
       });
-      setPasswordMsg({ type: 'success', text: res.data.message });
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      const data = await res.json();
+      if (res.ok) {
+        setPasswordMsg({ type: 'success', text: data.message });
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        setPasswordMsg({ type: 'error', text: data.error || 'Failed to change password' });
+      }
     } catch (err) {
-      setPasswordMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password' });
+      setPasswordMsg({ type: 'error', text: 'Failed to connect to server' });
     }
   };
 
