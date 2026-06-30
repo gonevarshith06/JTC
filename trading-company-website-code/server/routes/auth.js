@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db, { logActivity } from '../db.js';
+import db, { logActivity, saveDb } from '../db.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -16,85 +16,83 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (db.users.find(u => u.email === email || u.mobile_number === mobileNumber)) {
+      return res.status(400).json({ error: 'Email or Mobile Number already exists' });
+    }
 
-    db.run(
-      'INSERT INTO users (full_name, email, mobile_number, password, role) VALUES (?, ?, ?, ?, ?)',
-      [fullName, email, mobileNumber, hashedPassword, 'Client'],
-      function (err) {
-        if (err) {
-          if (err.message.includes('UNIQUE')) {
-            return res.status(400).json({ error: 'Email or Mobile Number already exists' });
-          }
-          return res.status(500).json({ error: 'Internal Server Error' });
-        }
-        
-        logActivity(this.lastID, 'Register', 'New client registered');
-        res.status(201).json({ message: 'Registration successful' });
-      }
-    );
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      id: Date.now(),
+      full_name: fullName,
+      email,
+      mobile_number: mobileNumber,
+      password: hashedPassword,
+      role: 'Client',
+      created_at: new Date().toISOString()
+    };
+    db.users.push(newUser);
+    saveDb();
+    
+    logActivity(newUser.id, 'Register', 'New client registered');
+    res.status(201).json({ message: 'Registration successful' });
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 // Login Route
-router.post('/login', (req, res) => {
-  const { identifier, password, rememberMe } = req.body; // identifier can be email or username(mobile)
+router.post('/login', async (req, res) => {
+  const { identifier, password, rememberMe } = req.body;
 
   if (!identifier || !password) {
     return res.status(400).json({ error: 'Identifier and password are required' });
   }
 
-  db.get(
-    'SELECT * FROM users WHERE email = ? OR mobile_number = ?',
-    [identifier, identifier],
-    async (err, user) => {
-      if (err) {
-         return res.status(500).json({ error: 'Internal Server Error' });
-      }
-
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-
-      if (!isPasswordValid) {
-        logActivity(user.id, 'Failed Login', 'Invalid password attempt');
-        // TODO: Rate limiting / lockout logic here for failed attempts
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const token = jwt.sign(
-        { id: user.id, role: user.role, email: user.email },
-        JWT_SECRET,
-        { expiresIn: rememberMe ? '7d' : '1d' } // Session timeout after 1 day or 7 days
-      );
-
-      db.run('INSERT INTO sessions (user_id, token) VALUES (?, ?)', [user.id, token]);
-      logActivity(user.id, 'Login', 'User logged in successfully');
-
-      res.cookie('jwt', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
-        sameSite: 'strict',
-      });
-
-      res.json({
-        message: 'Login successful',
-        user: { id: user.id, fullName: user.full_name, email: user.email, role: user.role }
-      });
+  try {
+    const user = db.users.find(u => u.email === identifier || u.mobile_number === identifier);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-  );
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      logActivity(user.id, 'Failed Login', 'Invalid password attempt');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, role: user.role, email: user.email },
+      JWT_SECRET,
+      { expiresIn: rememberMe ? '7d' : '1d' }
+    );
+
+    db.sessions.push({ id: Date.now(), user_id: user.id, token, created_at: new Date().toISOString() });
+    saveDb();
+
+    logActivity(user.id, 'Login', 'User logged in successfully');
+
+    res.cookie('jwt', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
+      sameSite: 'strict',
+    });
+
+    res.json({
+      message: 'Login successful',
+      user: { id: user.id, fullName: user.full_name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Logout Route
 router.post('/logout', requireAuth, (req, res) => {
   const token = req.cookies.jwt;
   if(token) {
-     db.run('DELETE FROM sessions WHERE token = ?', [token]);
+     db.sessions = db.sessions.filter(s => s.token !== token);
+     saveDb();
   }
   logActivity(req.user.id, 'Logout', 'User logged out');
   res.clearCookie('jwt');
@@ -103,12 +101,12 @@ router.post('/logout', requireAuth, (req, res) => {
 
 // Get Profile
 router.get('/profile', requireAuth, (req, res) => {
-  db.get('SELECT id, full_name, email, mobile_number, role FROM users WHERE id = ?', [req.user.id], (err, user) => {
-    if (err || !user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
-  });
+  const user = db.users.find(u => u.id === req.user.id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  const { id, full_name, email, mobile_number, role } = user;
+  res.json({ id, full_name, email, mobile_number, role });
 });
 
 export default router;

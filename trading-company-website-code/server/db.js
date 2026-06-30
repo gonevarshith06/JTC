@@ -1,15 +1,8 @@
-import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 
-// Vercel serverless functions have a read-only filesystem except for /tmp
-// Also import.meta.url often breaks in Vercel's esbuild bundler
 const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
-const dbPath = isVercel 
-  ? '/tmp/database.sqlite' 
-  : './database.sqlite';
-  
-const db = new sqlite3.Database(dbPath);
+const dbPath = isVercel ? '/tmp/db.json' : './db.json';
 
 // Initial static products for seeding
 const initialProducts = [
@@ -23,111 +16,64 @@ const initialProducts = [
   { id: 'masoor-dal', name: 'Masoor Dal', category: 'Dal & Pulses', type: 'pulse', accent: '#d36f53', packageText: '25 kg and 50 kg bags', description: 'Bulk masoor dal selected for clean appearance, good quality, and timely availability.', image: '' }
 ];
 
-export const initDb = () => {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run(`
-        CREATE TABLE IF NOT EXISTS users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          full_name TEXT NOT NULL,
-          email TEXT UNIQUE NOT NULL,
-          mobile_number TEXT UNIQUE,
-          password TEXT NOT NULL,
-          role TEXT NOT NULL DEFAULT 'Client',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+let db = {
+  users: [],
+  sessions: [],
+  activity_logs: [],
+  products: [],
+  orders: [],
+  messages: []
+};
 
-      db.run(`
-        CREATE TABLE IF NOT EXISTS sessions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER NOT NULL,
-          token TEXT NOT NULL,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-      `);
+export const saveDb = () => {
+  try {
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+  } catch (e) {
+    console.error("Failed to save DB", e);
+  }
+};
 
-      db.run(`
-        CREATE TABLE IF NOT EXISTS activity_logs (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER NOT NULL,
-          action TEXT NOT NULL,
-          details TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-      `);
+export const initDb = async () => {
+  if (fs.existsSync(dbPath)) {
+    try {
+      db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    } catch (e) {
+      console.error("Failed to read DB", e);
+    }
+  }
+  
+  if (!db.products || db.products.length === 0) {
+    db.products = [...initialProducts];
+  }
+  if (!db.users) db.users = [];
+  if (!db.orders) db.orders = [];
+  if (!db.messages) db.messages = [];
+  if (!db.sessions) db.sessions = [];
+  if (!db.activity_logs) db.activity_logs = [];
 
-      db.run(`
-        CREATE TABLE IF NOT EXISTS products (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          category TEXT NOT NULL,
-          type TEXT NOT NULL,
-          accent TEXT,
-          packageText TEXT,
-          description TEXT,
-          image TEXT
-        )
-      `);
-
-      db.run(`
-        CREATE TABLE IF NOT EXISTS orders (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          ownerName TEXT NOT NULL,
-          shopName TEXT NOT NULL,
-          mobile TEXT NOT NULL,
-          email TEXT NOT NULL,
-          address TEXT NOT NULL,
-          product TEXT NOT NULL,
-          quantity TEXT NOT NULL,
-          message TEXT,
-          status TEXT DEFAULT 'Pending',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      db.run(`
-        CREATE TABLE IF NOT EXISTS messages (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          mobile TEXT NOT NULL,
-          email TEXT,
-          message TEXT NOT NULL,
-          status TEXT DEFAULT 'Unread',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      // Create default admin
-      db.get('SELECT * FROM users WHERE role = ?', ['Admin'], async (err, row) => {
-        if (!row) {
-          const hashedPassword = await bcrypt.hash('Admin@123', 10);
-          db.run(
-            'INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)',
-            ['Admin', 'admin@company.com', hashedPassword, 'Admin']
-          );
-        }
-
-        // Seed products if empty
-        db.get('SELECT COUNT(*) as count FROM products', (err, row) => {
-          if (row && row.count === 0) {
-            const stmt = db.prepare('INSERT INTO products (id, name, category, type, accent, packageText, description, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-            initialProducts.forEach(p => {
-              stmt.run(p.id, p.name, p.category, p.type, p.accent, p.packageText, p.description, p.image);
-            });
-            stmt.finalize();
-          }
-          resolve();
-        });
-      });
+  if (!db.users.find(u => u.role === 'Admin')) {
+    db.users.push({
+      id: 1,
+      full_name: 'Admin',
+      email: 'admin@company.com',
+      mobile_number: '0000000000',
+      password: await bcrypt.hash('Admin@123', 10),
+      role: 'Admin',
+      created_at: new Date().toISOString()
     });
-  });
+  }
+  saveDb();
 };
 
 export const logActivity = (userId, action, details = '') => {
-    db.run('INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)', [userId, action, details]);
-}
+  db.activity_logs.push({
+    id: Date.now(),
+    user_id: userId,
+    action,
+    details,
+    created_at: new Date().toISOString()
+  });
+  saveDb();
+};
 
 export default db;

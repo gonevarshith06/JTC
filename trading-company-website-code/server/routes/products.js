@@ -1,68 +1,64 @@
 import express from 'express';
-import db from '../db.js';
-import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
+import db, { logActivity, saveDb } from '../db.js';
+import { requireAuth } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Get all products (Public)
+// Get all products
 router.get('/', (req, res) => {
-  db.all('SELECT * FROM products', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: 'Failed to retrieve products' });
-    }
-    res.json(rows);
-  });
+  res.json(db.products);
 });
 
-// Create a new product (Admin only)
-router.post('/', requireAuth, requireRole('Admin'), (req, res) => {
+// Create product (Admin only)
+router.post('/', requireAuth, (req, res) => {
+  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
+  
   const { id, name, category, type, accent, packageText, description, image } = req.body;
   
-  if (!id || !name || !category || !type) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (db.products.find(p => p.id === id)) {
+    return res.status(400).json({ error: 'Product ID already exists' });
   }
 
-  const stmt = db.prepare('INSERT INTO products (id, name, category, type, accent, packageText, description, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  stmt.run(id, name, category, type, accent, packageText, description, image, function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE')) {
-        return res.status(400).json({ error: 'Product ID already exists' });
-      }
-      return res.status(500).json({ error: 'Failed to create product' });
-    }
-    res.status(201).json({ message: 'Product created successfully', productId: id });
-  });
-  stmt.finalize();
-});
-
-// Update a product (Admin only)
-router.put('/:id', requireAuth, requireRole('Admin'), (req, res) => {
-  const { name, category, type, accent, packageText, description, image } = req.body;
+  const newProduct = { id, name, category, type, accent, packageText, description, image };
+  db.products.push(newProduct);
+  saveDb();
   
-  const stmt = db.prepare('UPDATE products SET name = ?, category = ?, type = ?, accent = ?, packageText = ?, description = ?, image = ? WHERE id = ?');
-  stmt.run(name, category, type, accent, packageText, description, image, req.params.id, function(err) {
-    if (err) {
-      return res.status(500).json({ error: 'Failed to update product' });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    res.json({ message: 'Product updated successfully' });
-  });
-  stmt.finalize();
+  logActivity(req.user.id, 'Create Product', `Product ${id} created`);
+  res.status(201).json(newProduct);
 });
 
-// Delete a product (Admin only)
-router.delete('/:id', requireAuth, requireRole('Admin'), (req, res) => {
-  db.run('DELETE FROM products WHERE id = ?', [req.params.id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: 'Failed to delete product' });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    res.json({ message: 'Product deleted successfully' });
-  });
+// Update product (Admin only)
+router.put('/:id', requireAuth, (req, res) => {
+  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
+  
+  const { name, category, type, accent, packageText, description, image } = req.body;
+  const index = db.products.findIndex(p => p.id === req.params.id);
+  
+  if (index === -1) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+
+  db.products[index] = { ...db.products[index], name, category, type, accent, packageText, description, image };
+  saveDb();
+  
+  logActivity(req.user.id, 'Update Product', `Product ${req.params.id} updated`);
+  res.json({ message: 'Product updated successfully' });
+});
+
+// Delete product (Admin only)
+router.delete('/:id', requireAuth, (req, res) => {
+  if (req.user.role !== 'Admin') return res.status(403).json({ error: 'Unauthorized' });
+  
+  const initialLength = db.products.length;
+  db.products = db.products.filter(p => p.id !== req.params.id);
+  
+  if (db.products.length === initialLength) {
+    return res.status(404).json({ error: 'Product not found' });
+  }
+  
+  saveDb();
+  logActivity(req.user.id, 'Delete Product', `Product ${req.params.id} deleted`);
+  res.json({ message: 'Product deleted successfully' });
 });
 
 export default router;
