@@ -1,17 +1,13 @@
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcryptjs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // Vercel serverless functions have a read-only filesystem except for /tmp
+// Also import.meta.url often breaks in Vercel's esbuild bundler
 const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
 const dbPath = isVercel 
-  ? path.join('/tmp', 'database.sqlite') 
-  : path.resolve(__dirname, 'database.sqlite');
+  ? '/tmp/database.sqlite' 
+  : './database.sqlite';
   
 const db = new sqlite3.Database(dbPath);
 
