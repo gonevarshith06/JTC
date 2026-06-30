@@ -36,9 +36,14 @@ app.use('/api/messages', messagesRoutes);
 
 // Initialize DB and start server
 initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Backend server running on http://127.0.0.1:${PORT}`);
-  });
+  // Only start listening if not running in a serverless environment
+  if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+      console.log(`Backend server running on http://127.0.0.1:${PORT}`);
+    });
+  }
 }).catch(err => {
   console.error('Failed to initialize database:', err);
 });
+
+export default app;
