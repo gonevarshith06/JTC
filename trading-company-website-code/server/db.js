@@ -7,7 +7,12 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.resolve(__dirname, 'database.sqlite');
+// Vercel serverless functions have a read-only filesystem except for /tmp
+const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+const dbPath = isVercel 
+  ? path.join('/tmp', 'database.sqlite') 
+  : path.resolve(__dirname, 'database.sqlite');
+  
 const db = new sqlite3.Database(dbPath);
 
 // Initial static products for seeding
